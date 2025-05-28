@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>QR Code Scanner & Generator</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap');
+  /* Reset and base */
+  * {
+    box-sizing: border-box;
+  }
+  body, html {
+    margin: 0; padding: 0;
+    height: 100vh;
+    background: #121212;
+    overflow: hidden;
+    font-family: 'Poppins', sans-serif;
+    color: #e0e0e0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+  }
+  /* Particle canvas behind */
+  #particle-canvas {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    z-index: 0;
+    background: #121212;
+  }
+
+  /* Main container centered */
+  #app-container {
+    z-index: 10;
+    position: relative;
+    width: 100%;
+    max-width: 640px;
+    background: rgba(30, 30, 30, 0.9);
+    border-radius: 12px;
+    box-shadow: 0 0 30px #00c853bb;
+    padding: 30px 40px 40px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    user-select: none;
+  }
+
+  h1 {
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: #00c853;
+    text-align: center;
+    user-select: text;
+  }
+  p.subtitle {
+    color: #a5d6a7;
+    margin-top: 0;
+    margin-bottom: 30px;
+    font-weight: 400;
+    text-align: center;
+    user-select: text;
+  }
+  .tabs {
+    display: flex;
+    width: 100%;
+    margin-bottom: 25px;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 0 15px #00c853aa;
+  }
+  .tab {
+    flex: 1;
+    padding: 15px 0;
+    text-align: center;
+    cursor: pointer;
+    background: #1e1e1e;
+    color: #bdbdbd;
+    font-weight: 600;
+    user-select: none;
+    transition: background-color 0.3s ease, color 0.3s ease;
+    white-space: nowrap;
+  }
+  .tab.active {
+    background: #00c853;
+    color: #121212;
+  }
+
+  .panel {
+    background: transparent;
+    border-radius: 8px;
+    padding: 0;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  /* QR Code Generator styles */
+  #generator-panel {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  #generator input[type="text"] {
+    width: 100%;
+    padding: 14px 18px;
+    font-size: 1.1rem;
+    border: none;
+    border-radius: 8px;
+    margin-bottom: 18px;
+    outline: none;
+    background: #262626;
+    color: #e0e0e0;
+    box-shadow: inset 0 0 8px #00c85388;
+    transition: box-shadow 0.3s ease;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  #generator input[type="text"]:focus {
+    box-shadow: 0 0 12px #00e676cc;
+  }
+  #generate-btn {
+    background: #00c853;
+    color: #121212;
+    border: none;
+    padding: 14px 24px;
+    font-weight: 600;
+    font-size: 0.92rem;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+    width: auto;
+    display: block;
+    min-width: 160px;
+    white-space: nowrap;
+    user-select: none;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  #generate-btn:hover,
+  #generate-btn:focus {
+    background: #00e676;
+    outline: none;
+  }
+  #generate-desc {
+    display: block;
+    text-align: center;
+    color: #a5d6a7;
+    font-size: 0.85rem;
+    margin-top: 6px;
+    user-select: none;
+  }
+  #qrcode {
+    margin-top: 25px;
+    display: flex;
+    justify-content: center;
+  }
+
+  /* QR Code Scanner styles */
+  #scanner-panel {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  #reader {
+    width: 100% !important;
+    max-width: 400px;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 0 12px #00c853cc;
+    background: #000;
+  }
+  #scanned-result {
+    margin-top: 22px;
+    word-break: break-word;
+    background: #2e7d32;
+    padding: 15px 22px;
+    border-radius: 8px;
+    color: #e0f2f1;
+    font-weight: 700;
+    font-size: 1.1rem;
+    min-height: 48px;
+    user-select: text;
+    width: 100%;
+    max-width: 400px;
+    text-align: center;
+  }
+  #scanner-error {
+    margin-top: 20px;
+    color: #ef5350;
+    font-weight: 600;
+    font-size: 0.95rem;
+    min-height: 24px;
+    user-select: none;
+    text-align: center;
+  }
+
+  footer {
+    margin-top: 30px;
+    color: #666;
+    font-size: 0.85rem;
+    text-align: center;
+    user-select: none;
+  }
+  @media (max-width: 680px) {
+    #app-container {
+      padding: 25px 20px 30px;
+      max-width: 90vw;
+    }
+    #reader, #scanned-result {
+      max-width: 100%;
+    }
+  }
+</style>
+</head>
+<body>
+  <canvas id="particle-canvas"></canvas>
+  <div id="app-container" role="main" aria-label="QR Code Scanner and Generator Application">
+    <h1>QR Code Scanner &amp; Generator</h1>
+    <p class="subtitle">Create your own QR codes or scan QR codes using your device camera</p>
+
+    <div class="tabs" role="tablist">
+      <div class="tab active" id="tab-generate" role="tab" aria-selected="true" tabindex="0" aria-controls="generator-panel">Generate QR Code</div>
+      <div class="tab" id="tab-scan" role="tab" aria-selected="false" tabindex="-1" aria-controls="scanner-panel">Scan QR Code</div>
+    </div>
+
+    <section class="panel" id="generator-panel" role="tabpanel" aria-labelledby="tab-generate">
+      <div id="generator">
+        <input type="text" id="text-to-encode" placeholder="Enter text or URL here" aria-label="Text to encode" autocomplete="off" />
+        <button id="generate-btn" aria-describedby="generate-desc">Generate QR Code</button>
+        <span id="generate-desc">Press to generate QR code from the entered text</span>
+        <div id="qrcode" aria-live="polite" aria-atomic="true"></div>
+      </div>
+    </section>
+
+    <section class="panel" id="scanner-panel" role="tabpanel" aria-labelledby="tab-scan" style="display:none;">
+      <div id="scanner">
+        <div id="reader" aria-label="QR code scanner video feed"></div>
+        <div id="scanner-error" role="alert" aria-live="assertive"></div>
+        <div id="scanned-result" aria-live="polite" aria-atomic="true">Scan result will appear here</div>
+      </div>
+    </section>
+
+    <footer>
+      &copy; 2024 QR Code App • Works on modern browsers with camera support
+    </footer>
+  </div>
+
+  <!-- QRCode.js for generating QR codes -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <!-- html5-qrcode for scanning QR codes -->
+  <script src="https://unpkg.com/html5-qrcode"></script>
+  <script>
+    (() => {
+      // Tab control with accessibility
+      const tabGenerate = document.getElementById('tab-generate');
+      const tabScan = document.getElementById('tab-scan');
+      const generatorPanel = document.getElementById('generator-panel');
+      const scannerPanel = document.getElementById('scanner-panel');
+
+      function activateTab(tabToActivate) {
+        if (tabToActivate === 'generate') {
+          tabGenerate.classList.add('active');
+          tabScan.classList.remove('active');
+          tabGenerate.setAttribute('aria-selected', 'true');
+          tabGenerate.setAttribute('tabindex', '0');
+          tabScan.setAttribute('aria-selected', 'false');
+          tabScan.setAttribute('tabindex', '-1');
+          generatorPanel.style.display = '';
+          scannerPanel.style.display = 'none';
+          stopScanner();
+        } else {
+          tabScan.classList.add('active');
+          tabGenerate.classList.remove('active');
+          tabScan.setAttribute('aria-selected', 'true');
+          tabScan.setAttribute('tabindex', '0');
+          tabGenerate.setAttribute('aria-selected', 'false');
+          tabGenerate.setAttribute('tabindex', '-1');
+          scannerPanel.style.display = '';
+          generatorPanel.style.display = 'none';
+          startScanner();
+        }
+      }
+
+      tabGenerate.addEventListener('click', () => activateTab('generate'));
+      tabScan.addEventListener('click', () => activateTab('scan'));
+      tabGenerate.addEventListener('keydown', e => {
+        if (e.key === 'Enter' || e.key===' ') {
+          e.preventDefault();
+          activateTab('generate');
+        }
+      });
+      tabScan.addEventListener('keydown', e => {
+        if (e.key === 'Enter' || e.key===' ') {
+          e.preventDefault();
+          activateTab('scan');
+        }
+      });
+
+      // QR Code Generator
+      let qrCodeInstance;
+      const generateBtn = document.getElementById('generate-btn');
+      const qrCodeContainer = document.getElementById('qrcode');
+
+      function generateQRCode(text) {
+        qrCodeContainer.innerHTML = '';
+        if (qrCodeInstance) {
+          qrCodeInstance.clear();
+        }
+        if (!text.trim()) {
+          qrCodeContainer.innerHTML = '<p style="color:#ef5350; font-weight:600; text-align:center;">Please enter text to generate QR code.</p>';
+          return;
+        }
+        qrCodeInstance = new QRCode(qrCodeContainer, {
+          text: text,
+          width: 220,
+          height: 220,
+          colorDark: "#00c853",
+          colorLight: "#ffffff",
+          correctLevel: QRCode.CorrectLevel.H
+        });
+      }
+
+      generateBtn.addEventListener('click', () => {
+        const text = document.getElementById('text-to-encode').value;
+        generateQRCode(text);
+      });
+
+      // QR Code Scanner
+      const scannedResult = document.getElementById('scanned-result');
+      const scannerError = document.getElementById('scanner-error');
+      let html5QrCode;
+      let scannerRunning = false;
+
+      function startScanner() {
+        if (scannerRunning) return;
+        scannerError.textContent = '';
+        scannedResult.textContent = 'Initializing scanner...';
+        html5QrCode = new Html5Qrcode("reader");
+
+        Html5Qrcode.getCameras().then(cameras => {
+          if (cameras && cameras.length) {
+            const cameraId = cameras[0].id;
+            html5QrCode.start(
+              cameraId,
+              {
+                fps: 10,
+                qrbox: { width: 250, height: 250 },
+                aspectRatio: 1.0,
+              },
+              qrCodeMessage => {
+                scannedResult.textContent = qrCodeMessage;
+              },
+              errorMessage => {
+                // ignore scan errors for UX
+              }
+            ).then(() => {
+              scannerRunning = true;
+            }).catch(err => {
+              scannerError.textContent = 'Unable to start camera for scanning. ' + err;
+              scannedResult.textContent = 'Scan result will appear here';
+            });
+          } else {
+            scannerError.textContent = 'No cameras found on this device.';
+            scannedResult.textContent = 'Scan result will appear here';
+          }
+        }).catch(err => {
+          scannerError.textContent = 'Error accessing cameras: ' + err;
+          scannedResult.textContent = 'Scan result will appear here';
+        });
+      }
+
+      function stopScanner() {
+        if (html5QrCode && scannerRunning) {
+          html5QrCode.stop().then(() => {
+            html5QrCode.clear();
+            scannerRunning = false;
+            scannedResult.textContent = 'Scan result will appear here';
+            scannerError.textContent = '';
+          }).catch(err => {
+            // ignoring errors on stop
+          });
+        }
+      }
+
+      // Auto start on generator tab
+      generateQRCode('');
+    })();
+
+    // Particle background animation
+    (() => {
+      const canvas = document.getElementById('particle-canvas');
+      const ctx = canvas.getContext('2d');
+
+      let width, height, particles;
+
+      function init() {
+        resize();
+        particles = [];
+        const particleCount = Math.floor((width * height) / 8000);
+
+        for (let i = 0; i < particleCount; i++) {
+          particles.push({
+            x: Math.random() * width,
+            y: Math.random() * height,
+            radius: 1 + Math.random() * 1.5,
+            vx: (Math.random() - 0.5) * 0.3,
+            vy: (Math.random() - 0.5) * 0.3,
+            alpha: 0.3 + Math.random() * 0.5,
+          });
+        }
+      }
+
+      function resize() {
+        width = window.innerWidth;
+        height = window.innerHeight;
+        canvas.width = width * devicePixelRatio;
+        canvas.height = height * devicePixelRatio;
+        canvas.style.width = width + 'px';
+        canvas.style.height = height + 'px';
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.scale(devicePixelRatio, devicePixelRatio);
+      }
+
+      function draw() {
+        ctx.clearRect(0, 0, width, height);
+
+        // Draw lines between close particles
+        for (let i = 0; i < particles.length; i++) {
+          const p1 = particles[i];
+          for (let j = i + 1; j < particles.length; j++) {
+            const p2 = particles[j];
+            const dx = p1.x - p2.x;
+            const dy = p1.y - p2.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist < 120) {
+              const alpha = (1 - dist / 120) * 0.15 * p1.alpha * p2.alpha;
+              ctx.strokeStyle = `rgba(0, 200, 83, ${alpha.toFixed(3)})`;
+              ctx.lineWidth = 1;
+              ctx.beginPath();
+              ctx.moveTo(p1.x, p1.y);
+              ctx.lineTo(p2.x, p2.y);
+              ctx.stroke();
+            }
+          }
+        }
+
+        // Draw particles
+        particles.forEach(p => {
+          ctx.beginPath();
+          let gradient = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.radius * 3);
+          gradient.addColorStop(0, `rgba(0, 200, 83, ${p.alpha})`);
+          gradient.addColorStop(1, 'rgba(0, 200, 83, 0)');
+          ctx.fillStyle = gradient;
+          ctx.arc(p.x, p.y, p.radius, 0, 2 * Math.PI);
+          ctx.fill();
+        });
+      }
+
+      function update() {
+        particles.forEach(p => {
+          p.x += p.vx;
+          p.y += p.vy;
+          if (p.x < 0 || p.x > width) p.vx = -p.vx;
+          if (p.y < 0 || p.y > height) p.vy = -p.vy;
+        });
+      }
+
+      function loop() {
+        update();
+        draw();
+        requestAnimationFrame(loop);
+      }
+
+      window.addEventListener('resize', () => {
+        resize();
+        init();
+      });
+
+      init();
+      loop();
+    })();
+  </script>
+</body>
+</html>
+
